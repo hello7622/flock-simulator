@@ -1,28 +1,31 @@
 package api
 
-import "github.com/hello7622/flock-simulator/simulator"
+import "flock-simulator/simulator"
 
-// API 请求和响应类型
+// API请求和响应类型
 
-type CreateSimulationRequest struct {
-	Birds     []simulator.Bird            `json:"birds"`
-	Obstacles []simulator.Obstacle        `json:"obstacles"`
-	Config    *simulator.SimulationConfig `json:"config"`
+type AddBirdRequest struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type AddObstacleRequest struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Radius float64 `json:"radius"`
+}
+
+type SetAttractorRequest struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Active bool    `json:"active"`
 }
 
 type SimulationResponse struct {
 	State *simulator.SimulationState `json:"state"`
-	Step  int                        `json:"step"`
-}
-
-type StepRequest struct {
-	Steps int `json:"steps"` // 执行的步数
-}
-
-type ErrorResponse struct {
-	Error string `json:"error"`
 }
 
 type SuccessResponse struct {
 	Message string `json:"message"`
+	Success bool   `json:"success"`
 }

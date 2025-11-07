@@ -1,116 +1,130 @@
 package simulator
 
-import "time"
+import (
+	"math/rand"
+	"strconv"
+	"time"
+)
 
 // FlockSimulator 鸟群模拟器
 type FlockSimulator struct {
-    state    *SimulationState
-    config   *SimulationConfig
-    decisionMaker *DecisionMaker
+	state  *SimulationState
+	config *SimulationConfig
+	boids  *BoidsSimulator
 }
 
 // NewFlockSimulator 创建新的鸟群模拟器
-func NewFlockSimulator(initialState *SimulationState, config *SimulationConfig) *FlockSimulator {
-    return &FlockSimulator{
-        state:    initialState,
-        config:   config,
-        decisionMaker: NewDecisionMaker(config),
-    }
+func NewFlockSimulator(config *SimulationConfig) *FlockSimulator {
+	if config == nil {
+		config = DefaultConfig()
+	}
+
+	// 初始化随机种子
+	rand.Seed(time.Now().UnixNano())
+
+	initialState := &SimulationState{
+		Birds:     []Bird{},
+		Obstacles: []Obstacle{},
+		Attractor: Attractor{Active: false},
+		Step:      0,
+		Running:   true,
+	}
+
+	return &FlockSimulator{
+		state:  initialState,
+		config: config,
+		boids:  NewBoidsSimulator(config),
+	}
+}
+
+// DefaultConfig 返回默认配置
+func DefaultConfig() *SimulationConfig {
+	return &SimulationConfig{
+		SeparationDistance: 25,
+		AlignmentDistance:  50,
+		CohesionDistance:   50,
+		MaxSpeed:           4,
+		MaxForce:           0.3, // 增加最大力
+		SeparationWeight:   1.5,
+		AlignmentWeight:    1.0,
+		CohesionWeight:     1.0,
+		AvoidanceWeight:    2.0,
+		AttractionWeight:   0.7, // 显著增加引导点权重
+	}
 }
 
 // Step 执行单步模拟
 func (fs *FlockSimulator) Step() *SimulationState {
-    decisions := make([]*DecisionResult, 0, len(fs.state.Birds))
-    
-    // 第一阶段：所有鸟做出决策
-    for i := range fs.state.Birds {
-        bird := &fs.state.Birds[i]
-        
-        // 创建其他鸟的列表（排除自己）
-        otherBirds := make([]Bird, 0, len(fs.state.Birds)-1)
-        for j := range fs.state.Birds {
-            if i != j {
-                otherBirds = append(otherBirds, fs.state.Birds[j])
-            }
-        }
-        
-        decision := fs.decisionMaker.MakeDecision(bird, fs.state.Obstacles, otherBirds)
-        decisions = append(decisions, decision)
-    }
-    
-    // 第二阶段：更新所有鸟的状态
-    for i, decision := range decisions {
-        fs.decisionMaker.UpdateBird(&fs.state.Birds[i], decision)
-    }
-    
-    // 更新模拟状态
-    fs.state.Step++
-    fs.state.Timestamp = time.Now().UnixMilli()
-    
-    return fs.state
+	if !fs.state.Running {
+		return fs.state
+	}
+
+	// 更新所有鸟的状态
+	for i := range fs.state.Birds {
+		bird := &fs.state.Birds[i]
+		fs.boids.UpdateBird(bird, fs.state.Birds, fs.state.Obstacles, fs.state.Attractor)
+	}
+
+	// 检查碰撞
+	fs.state.Birds = fs.boids.CheckCollisions(fs.state.Birds, fs.state.Obstacles)
+
+	fs.state.Step++
+	return fs.state
 }
 
-// GetState 获取当前模拟状态
+// AddBird 添加鸟
+func (fs *FlockSimulator) AddBird(position Point) {
+	bird := Bird{
+		ID:       generateID(),
+		Position: position,
+		Velocity: Velocity{
+			DX: (rand.Float64() - 0.5) * 2,
+			DY: (rand.Float64() - 0.5) * 2,
+		},
+		Radius: 3,
+	}
+	fs.state.Birds = append(fs.state.Birds, bird)
+}
+
+// AddObstacle 添加障碍物
+func (fs *FlockSimulator) AddObstacle(position Point, radius float64) {
+	obstacle := Obstacle{
+		ID:       generateID(),
+		Position: position,
+		Radius:   radius,
+	}
+	fs.state.Obstacles = append(fs.state.Obstacles, obstacle)
+}
+
+// SetAttractor 设置引导点
+func (fs *FlockSimulator) SetAttractor(position Point, active bool) {
+	fs.state.Attractor = Attractor{
+		Position: position,
+		Active:   active,
+	}
+}
+
+// ToggleRunning 切换运行状态
+func (fs *FlockSimulator) ToggleRunning() {
+	fs.state.Running = !fs.state.Running
+}
+
+// GetState 获取当前状态
 func (fs *FlockSimulator) GetState() *SimulationState {
-    return fs.state
+	return fs.state
 }
 
-// Reset 重置模拟器到初始状态
-func (fs *FlockSimulator) Reset(initialState *SimulationState) {
-    fs.state = initialState
+// Reset 重置模拟器
+func (fs *FlockSimulator) Reset() {
+	fs.state = &SimulationState{
+		Birds:     []Bird{},
+		Obstacles: []Obstacle{},
+		Attractor: Attractor{Active: false},
+		Step:      0,
+		Running:   true,
+	}
 }
 
-// CreateDefaultSimulation 创建默认模拟配置
-func CreateDefaultSimulation() (*SimulationState, *SimulationConfig) {
-    config := &SimulationConfig{
-        TimeStep:       1.0,
-        PerfectDistance: 8.0,
-        MaxSpeed:       5.0,
-        MaxTurnAngle:   30.0,
-    }
-    
-    state := &SimulationState{
-        Birds: []Bird{
-            {
-                ID:             "bird_1",
-                Position:       Point{X: 0, Y: 0},
-                Velocity:       Velocity{Speed: 2.0, Angle: 0},
-                DetectionRadius: 20.0,
-                DefaultSpeed:   2.0,
-                FOVAngle:       45.0,
-            },
-            {
-                ID:             "bird_2",
-                Position:       Point{X: 10, Y: 10},
-                Velocity:       Velocity{Speed: 2.0, Angle: 45},
-                DetectionRadius: 20.0,
-                DefaultSpeed:   2.0,
-                FOVAngle:       45.0,
-            },
-            {
-                ID:             "bird_3",
-                Position:       Point{X: -10, Y: 5},
-                Velocity:       Velocity{Speed: 2.0, Angle: 90},
-                DetectionRadius: 20.0,
-                DefaultSpeed:   2.0,
-                FOVAngle:       45.0,
-            },
-        },
-        Obstacles: []Obstacle{
-            {
-                ID:       "obstacle_1",
-                Position: Point{X: 15, Y: 15},
-                Radius:   3.0,
-            },
-            {
-                ID:       "obstacle_2",
-                Position: Point{X: 25, Y: 5},
-                Radius:   2.0,
-            },
-        },
-        Step:      0,
-        Timestamp: time.Now().UnixMilli(),
-    }
-    
-    return state, config
+func generateID() string {
+	return strconv.FormatInt(rand.Int63(), 36)
 }

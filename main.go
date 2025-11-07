@@ -2,29 +2,66 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"strconv"
 
-	"github.com/hello7622/flock-simulator/api"
+	"flock-simulator/api"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
-	// 设置路由
-	http.HandleFunc("/api/simulation/create", api.CreateSimulationHandler)
-	http.HandleFunc("/api/simulation/step", api.StepSimulationHandler)
-	http.HandleFunc("/api/simulation/state", api.GetStateHandler)
-	http.HandleFunc("/api/simulation/reset", api.ResetSimulationHandler)
+	router := mux.NewRouter()
 
-	// 静态文件服务（用于前端）
-	http.Handle("/", http.FileServer(http.Dir("./static")))
+	// API路由
+	router.HandleFunc("/api/state", api.GetStateHandler).Methods("GET")
+	router.HandleFunc("/api/step", api.StepHandler).Methods("POST")
+	router.HandleFunc("/api/bird", api.AddBirdHandler).Methods("POST")
+	router.HandleFunc("/api/obstacle", api.AddObstacleHandler).Methods("POST")
+	router.HandleFunc("/api/attractor", api.SetAttractorHandler).Methods("POST")
+	router.HandleFunc("/api/toggle", api.ToggleRunningHandler).Methods("POST")
+	router.HandleFunc("/api/reset", api.ResetHandler).Methods("POST")
 
-	log.Println("Flock Simulator API server starting on :8080")
-	log.Println("Available endpoints:")
-	log.Println("  POST   /api/simulation/create - Create new simulation")
-	log.Println("  POST   /api/simulation/step   - Advance simulation")
-	log.Println("  GET    /api/simulation/state  - Get current state")
-	log.Println("  POST   /api/simulation/reset  - Reset simulation")
+	// 静态文件服务
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
 
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	port := getPort()
+	log.Printf("Flock Simulator starting on :%s", port)
+	log.Printf("Open http://localhost:%s in your browser", port)
+
+	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatal("Server failed to start: ", err)
 	}
+}
+
+func getPort() string {
+	port := "8080"
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		port = envPort
+	}
+
+	// 检查端口是否被占用
+	for i := 8080; i <= 8090; i++ {
+		testPort := strconv.Itoa(i)
+		if isPortAvailable(testPort) {
+			if testPort != port {
+				log.Printf("Port %s is occupied, using port %s instead", port, testPort)
+			}
+			return testPort
+		}
+	}
+
+	log.Printf("Port %s is occupied, but no alternative found. Continuing anyway...", port)
+	return port
+}
+
+func isPortAvailable(port string) bool {
+	conn, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
 }

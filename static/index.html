@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boids Flock Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .simulation-area {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #simulationCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: default;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group h3 {
+            margin-bottom: 15px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 8px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button.active {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 0 20px rgba(245, 87, 108, 0.4);
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            margin-top: auto;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .cursor-crosshair {
+            cursor: crosshair;
+        }
+
+        .cursor-pointer {
+            cursor: pointer;
+        }
+
+        .preview-obstacle {
+            position: absolute;
+            border: 2px dashed rgba(255, 100, 100, 0.8);
+            background: rgba(255, 100, 100, 0.2);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+        }
+
+        .attractor {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #ffeb3b 0%, #ff9800 100%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: pulse 1.5s ease-in-out infinite alternate;
+            box-shadow: 0 0 20px #ffeb3b;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); opacity: 0.8; }
+            to { transform: scale(1.3); opacity: 1; }
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 300;
+            background: linear-gradient(135deg, #fff 0%, #a8edea 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="control-group">
+                <div class="title">Boids Simulator</div>
+                <div class="subtitle">Classic Flocking Behavior</div>
+                
+                <button id="pauseBtn">⏸️ Pause Simulation</button>
+                <button id="resetBtn">🔄 Reset Canvas</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Creation Tools</h3>
+                <button id="addBirdBtn">🐦 Add Birds (Click)</button>
+                <button id="addObstacleBtn">🚫 Add Obstacles (Drag)</button>
+                <button id="addAttractorBtn">🎯 Global Attractor (Hold)</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Simulation Info</h3>
+                <div class="info-panel">
+                    <div class="info-item">
+                        <span>Birds:</span>
+                        <span id="birdCount">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Obstacles:</span>
+                        <span id="obstacleCount">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Step:</span>
+                        <span id="stepCount">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Status:</span>
+                        <span id="statusText">Running</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status" id="status">
+                Ready to simulate flocking behavior. Click buttons to add elements.
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="simulation-area">
+                <canvas id="simulationCanvas" width="1200" height="800"></canvas>
+                <div id="previewObstacle" class="preview-obstacle"></div>
+                <div id="attractor" class="attractor" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="simulator.js"></script>
+</body>
+</html>

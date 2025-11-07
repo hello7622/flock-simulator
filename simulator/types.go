@@ -6,20 +6,18 @@ type Point struct {
 	Y float64 `json:"y"`
 }
 
-// Velocity 表示速度向量（极坐标形式）
+// Velocity 表示速度向量
 type Velocity struct {
-	Speed float64 `json:"speed"` // 速度大小
-	Angle float64 `json:"angle"` // 角度，范围 [0, 360) 度
+	DX float64 `json:"dx"`
+	DY float64 `json:"dy"`
 }
 
-// Bird 表示单个鸟或无人机
+// Bird 表示单个飞鸟
 type Bird struct {
-	ID              string   `json:"id"`
-	Position        Point    `json:"position"`
-	Velocity        Velocity `json:"velocity"`
-	DetectionRadius float64  `json:"detection_radius"`
-	DefaultSpeed    float64  `json:"default_speed"`
-	FOVAngle        float64  `json:"fov_angle"` // 视野角度，默认 45 度
+	ID       string   `json:"id"`
+	Position Point    `json:"position"`
+	Velocity Velocity `json:"velocity"`
+	Radius   float64  `json:"radius"`
 }
 
 // Obstacle 表示障碍物
@@ -29,26 +27,31 @@ type Obstacle struct {
 	Radius   float64 `json:"radius"`
 }
 
+// Attractor 表示全局引导点
+type Attractor struct {
+	Position Point `json:"position"`
+	Active   bool  `json:"active"`
+}
+
 // SimulationConfig 模拟配置
 type SimulationConfig struct {
-	TimeStep        float64 `json:"time_step"`        // 时间步长
-	PerfectDistance float64 `json:"perfect_distance"` // 理想间距
-	MaxSpeed        float64 `json:"max_speed"`        // 最大速度限制
-	MaxTurnAngle    float64 `json:"max_turn_angle"`   // 最大转向角度
+	SeparationDistance float64 `json:"separation_distance"`
+	AlignmentDistance  float64 `json:"alignment_distance"`
+	CohesionDistance   float64 `json:"cohesion_distance"`
+	MaxSpeed           float64 `json:"max_speed"`
+	MaxForce           float64 `json:"max_force"`
+	SeparationWeight   float64 `json:"separation_weight"`
+	AlignmentWeight    float64 `json:"alignment_weight"`
+	CohesionWeight     float64 `json:"cohesion_weight"`
+	AvoidanceWeight    float64 `json:"avoidance_weight"`
+	AttractionWeight   float64 `json:"attraction_weight"`
 }
 
 // SimulationState 模拟状态
 type SimulationState struct {
 	Birds     []Bird     `json:"birds"`
 	Obstacles []Obstacle `json:"obstacles"`
+	Attractor Attractor  `json:"attractor"`
 	Step      int        `json:"step"`
-	Timestamp int64      `json:"timestamp"`
-}
-
-// DecisionResult 决策结果
-type DecisionResult struct {
-	BirdID   string   `json:"bird_id"`
-	Velocity Velocity `json:"velocity"`
-	Priority int      `json:"priority"` // 触发的优先级
-	Reason   string   `json:"reason"`   // 决策原因
+	Running   bool       `json:"running"`
 }

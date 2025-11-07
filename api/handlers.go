@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/hello7622/flock-simulator/simulator"
+	"flock-simulator/simulator"
 )
 
 var (
@@ -13,82 +13,16 @@ var (
 	simulatorMutex   sync.RWMutex
 )
 
-// CreateSimulationHandler 创建新的模拟
-func CreateSimulationHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req CreateSimulationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	state := &simulator.SimulationState{
-		Birds:     req.Birds,
-		Obstacles: req.Obstacles,
-		Step:      0,
-	}
-
-	config := req.Config
-	if config == nil {
-		// 使用默认配置
-		_, defaultConfig := simulator.CreateDefaultSimulation()
-		config = defaultConfig
-	}
-
+// 初始化模拟器
+func init() {
 	simulatorMutex.Lock()
-	currentSimulator = simulator.NewFlockSimulator(state, config)
-	simulatorMutex.Unlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SimulationResponse{
-		State: state,
-		Step:  0,
-	})
+	defer simulatorMutex.Unlock()
+	// 使用默认配置创建模拟器
+	config := simulator.DefaultConfig()
+	currentSimulator = simulator.NewFlockSimulator(config)
 }
 
-// StepSimulationHandler 执行模拟步进
-func StepSimulationHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req StepRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	steps := req.Steps
-	if steps <= 0 {
-		steps = 1
-	}
-
-	simulatorMutex.Lock()
-	if currentSimulator == nil {
-		simulatorMutex.Unlock()
-		http.Error(w, "No active simulation", http.StatusBadRequest)
-		return
-	}
-
-	var finalState *simulator.SimulationState
-	for i := 0; i < steps; i++ {
-		finalState = currentSimulator.Step()
-	}
-	simulatorMutex.Unlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SimulationResponse{
-		State: finalState,
-		Step:  finalState.Step,
-	})
-}
-
-// GetStateHandler 获取当前模拟状态
+// GetStateHandler 获取当前状态
 func GetStateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -96,37 +30,124 @@ func GetStateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	simulatorMutex.RLock()
-	defer simulatorMutex.RUnlock()
-
-	if currentSimulator == nil {
-		http.Error(w, "No active simulation", http.StatusBadRequest)
-		return
-	}
-
 	state := currentSimulator.GetState()
+	simulatorMutex.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SimulationResponse{
-		State: state,
-		Step:  state.Step,
-	})
+	json.NewEncoder(w).Encode(SimulationResponse{State: state})
 }
 
-// ResetSimulationHandler 重置模拟
-func ResetSimulationHandler(w http.ResponseWriter, r *http.Request) {
+// StepHandler 执行单步模拟
+func StepHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	state, config := simulator.CreateDefaultSimulation()
+	simulatorMutex.Lock()
+	state := currentSimulator.Step()
+	simulatorMutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SimulationResponse{State: state})
+}
+
+// AddBirdHandler 添加鸟
+func AddBirdHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req AddBirdRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 
 	simulatorMutex.Lock()
-	currentSimulator = simulator.NewFlockSimulator(state, config)
+	currentSimulator.AddBird(simulator.Point{X: req.X, Y: req.Y})
+	state := currentSimulator.GetState()
+	simulatorMutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SimulationResponse{State: state})
+}
+
+// AddObstacleHandler 添加障碍物
+func AddObstacleHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req AddObstacleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	simulatorMutex.Lock()
+	currentSimulator.AddObstacle(simulator.Point{X: req.X, Y: req.Y}, req.Radius)
+	state := currentSimulator.GetState()
+	simulatorMutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SimulationResponse{State: state})
+}
+
+// SetAttractorHandler 设置引导点
+func SetAttractorHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req SetAttractorRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	simulatorMutex.Lock()
+	currentSimulator.SetAttractor(simulator.Point{X: req.X, Y: req.Y}, req.Active)
+	state := currentSimulator.GetState()
+	simulatorMutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SimulationResponse{State: state})
+}
+
+// ToggleRunningHandler 切换运行状态
+func ToggleRunningHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	simulatorMutex.Lock()
+	currentSimulator.ToggleRunning()
+	state := currentSimulator.GetState()
+	simulatorMutex.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(SimulationResponse{State: state})
+}
+
+// ResetHandler 重置模拟
+func ResetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	simulatorMutex.Lock()
+	currentSimulator.Reset()
 	simulatorMutex.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SuccessResponse{
-		Message: "Simulation reset to default state",
+		Message: "Simulation reset",
+		Success: true,
 	})
 }
