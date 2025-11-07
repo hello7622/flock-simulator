@@ -1,3 +1,3 @@
-module github.com/your-username/flock-simulator
+module github.com/hello7622/flock-simulator
 
 go 1.23
