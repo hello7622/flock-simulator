@@ -2,7 +2,6 @@
 
 ## 项目信息
 
-- **仓库地址**: `git@github.com:hello7622/flock-simulator.git`
 - **技术栈**: Go 1.23 + 标准库 HTTP Server
 - **架构**: 模块化设计，RESTful API
 
