@@ -1,12 +1,14 @@
 # 鸟群模拟系统 - Go 后端 API
 
 ## 项目信息
+
 - **仓库地址**: `git@github.com:hello7622/flock-simulator.git`
 - **技术栈**: Go 1.23 + 标准库 HTTP Server
 - **架构**: 模块化设计，RESTful API
 
 ## 项目结构
-```
+
+```plaintext
 flock-simulator/
 ├── go.mod
 ├── main.go                 # HTTP 服务器入口
@@ -24,16 +26,19 @@ flock-simulator/
 ## 核心设计思路
 
 ### 1. 优先级行为系统
+
 - **优先级1**: 障碍物避障 - 紧急安全行为
 - **优先级2**: 鸟群交互 - 群体协调行为  
 - **优先级3**: 随机移动 - 默认探索行为
 
 ### 2. 物理模型
+
 - 基于极坐标的速度向量系统
 - 扇形视野检测机制
 - 向量合成物理运动
 
 ### 3. 状态管理
+
 - 线程安全的模拟状态管理
 - 时间步进式模拟推进
 - 完整的重置和初始化支持
@@ -41,9 +46,11 @@ flock-simulator/
 ## API 接口文档
 
 ### 1. 创建模拟实例
+
 **端点**: `POST /api/simulation/create`
 
 **请求体**:
+
 ```json
 {
   "birds": [
@@ -73,9 +80,11 @@ flock-simulator/
 ```
 
 ### 2. 执行模拟步进
+
 **端点**: `POST /api/simulation/step`
 
 **请求体**:
+
 ```json
 {
   "steps": 1
@@ -83,14 +92,17 @@ flock-simulator/
 ```
 
 ### 3. 获取当前状态
+
 **端点**: `GET /api/simulation/state`
 
 ### 4. 重置模拟
+
 **端点**: `POST /api/simulation/reset`
 
 ## 数据模型
 
 ### Bird (鸟类实体)
+
 ```go
 type Bird struct {
     ID             string   `json:"id"`
@@ -103,6 +115,7 @@ type Bird struct {
 ```
 
 ### SimulationState (模拟状态)
+
 ```go
 type SimulationState struct {
     Birds     []Bird    `json:"birds"`
@@ -113,12 +126,15 @@ type SimulationState struct {
 ```
 
 ## 启动方式
+
 ```bash
 go run main.go
 ```
+
 服务启动在 `http://localhost:8080`
 
 ## 扩展性说明
+
 - 支持动态添加/移除鸟类和障碍物
 - 可配置的模拟参数
 - 线程安全的并发访问
